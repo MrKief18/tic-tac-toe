@@ -38,3 +38,5 @@ Cell clicks are handled via a single `forEach` listener attached at page load.
 - Repo: `https://github.com/MrKief18/tic-tac-toe`
 - Before starting new projects: create a GitHub repo, commit with comments, and push (`gh repo create` — CLI is authenticated as `MrKief18`)
 - Add inline comments to all code for readability and easy reverting
+- **Commit and push after every meaningful change** — do not batch unrelated edits into one commit; push immediately so no work is ever lost
+- Write a clear commit message describing what changed and why
