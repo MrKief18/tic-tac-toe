@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic Tac Toe</title>
+  <style>
+    /* ── Reset ── */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Page layout: dark centered column ── */
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0f172a;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #e2e8f0;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      margin-bottom: 1.5rem;
+      color: #f8fafc;
+    }
+
+    /* ── Turn / result message bar ── */
+    #status {
+      font-size: 1.1rem;
+      margin-bottom: 1.25rem;
+      height: 1.5rem;        /* fixed height prevents layout shift */
+      color: #94a3b8;
+      transition: color 0.2s;
+    }
+    #status.win  { color: #4ade80; font-weight: 600; } /* green on win  */
+    #status.draw { color: #facc15; font-weight: 600; } /* yellow on draw */
+
+    /* ── 3x3 grid board ── */
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 110px);
+      grid-template-rows: repeat(3, 110px);
+      gap: 8px;
+    }
+
+    /* ── Individual cell ── */
+    .cell {
+      background: #1e293b;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      user-select: none;
+    }
+    .cell:hover:not(.taken) { background: #273449; transform: scale(1.04); }
+    .cell.taken   { cursor: default; }           /* disable pointer after click */
+    .cell.x       { color: #60a5fa; }            /* X = blue  */
+    .cell.o       { color: #f472b6; }            /* O = pink  */
+    .cell.win-cell { background: #1e3a2f; }      /* highlight winning trio */
+
+    /* ── Restart button ── */
+    #restart {
+      margin-top: 1.5rem;
+      padding: 0.6rem 1.8rem;
+      font-size: 1rem;
+      font-weight: 600;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    #restart:hover { background: #2563eb; transform: scale(1.03); }
+
+    /* ── Score tracker row ── */
+    #score {
+      display: flex;
+      gap: 2rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+      color: #94a3b8;
+    }
+    .score-item            { text-align: center; }
+    .score-item span       { display: block; font-size: 1.5rem; font-weight: 700; }
+    .score-item.x-score    span { color: #60a5fa; }
+    .score-item.o-score    span { color: #f472b6; }
+    .score-item.draw-score span { color: #facc15; }
+  </style>
+</head>
+<body>
+  <h1>Tic Tac Toe</h1>
+
+  <!-- Scoreboard: persists across restarts -->
+  <div id="score">
+    <div class="score-item x-score">X <span id="score-x">0</span></div>
+    <div class="score-item draw-score">Draws <span id="score-d">0</span></div>
+    <div class="score-item o-score">O <span id="score-o">0</span></div>
+  </div>
+
+  <!-- Current turn or result message -->
+  <div id="status">X's turn</div>
+
+  <!-- Game board: 9 cells, indexed 0–8 left-to-right, top-to-bottom -->
+  <div id="board">
+    <div class="cell" data-i="0"></div>
+    <div class="cell" data-i="1"></div>
+    <div class="cell" data-i="2"></div>
+    <div class="cell" data-i="3"></div>
+    <div class="cell" data-i="4"></div>
+    <div class="cell" data-i="5"></div>
+    <div class="cell" data-i="6"></div>
+    <div class="cell" data-i="7"></div>
+    <div class="cell" data-i="8"></div>
+  </div>
+
+  <button id="restart">Restart</button>
+
+  <script>
+    // All 8 possible winning combinations (indices into the board array)
+    const WINS = [
+      [0,1,2], [3,4,5], [6,7,8],  // rows
+      [0,3,6], [1,4,7], [2,5,8],  // columns
+      [0,4,8], [2,4,6]             // diagonals
+    ];
+
+    // Game state: board array, whose turn, whether game is over
+    let board, current, over;
+
+    // Score state: persists across restarts until page reload
+    let scores = { X: 0, O: 0, D: 0 };
+
+    const cells  = document.querySelectorAll('.cell');
+    const status = document.getElementById('status');
+
+    // Reset board state and clear all cell visuals — scores are NOT reset
+    function init() {
+      board   = Array(9).fill('');
+      current = 'X';
+      over    = false;
+      status.textContent = "X's turn";
+      status.className   = '';
+      cells.forEach(c => { c.textContent = ''; c.className = 'cell'; });
+    }
+
+    // Returns the winning [a, b, c] triple, or null if no winner yet
+    function checkWin() {
+      for (const [a, b, c] of WINS) {
+        if (board[a] && board[a] === board[b] && board[a] === board[c])
+          return [a, b, c];
+      }
+      return null;
+    }
+
+    // Handle a cell click: mark it, check for win/draw, then switch turns
+    cells.forEach(cell => {
+      cell.addEventListener('click', () => {
+        const i = +cell.dataset.i;
+        if (over || board[i]) return; // ignore clicks after game ends or on taken cell
+
+        // Mark this cell for the current player
+        board[i] = current;
+        cell.textContent = current;
+        cell.classList.add('taken', current.toLowerCase());
+
+        const win = checkWin();
+        if (win) {
+          // Win: highlight the three winning cells and update score
+          over = true;
+          status.textContent = `${current} wins!`;
+          status.className   = 'win';
+          win.forEach(idx => cells[idx].classList.add('win-cell'));
+          scores[current]++;
+          updateScore();
+        } else if (board.every(v => v)) {
+          // Draw: all 9 cells filled with no winner
+          over = true;
+          status.textContent = "It's a draw!";
+          status.className   = 'draw';
+          scores.D++;
+          updateScore();
+        } else {
+          // No result yet — switch to the other player
+          current = current === 'X' ? 'O' : 'X';
+          status.textContent = `${current}'s turn`;
+        }
+      });
+    });
+
+    // Push current score totals into the DOM
+    function updateScore() {
+      document.getElementById('score-x').textContent = scores.X;
+      document.getElementById('score-o').textContent = scores.O;
+      document.getElementById('score-d').textContent = scores.D;
+    }
+
+    // Restart resets the board but keeps the running score
+    document.getElementById('restart').addEventListener('click', init);
+
+    // Kick off the first game
+    init();
+  </script>
+</body>
+</html>
